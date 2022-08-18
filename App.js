@@ -5,6 +5,7 @@ import BarcodeMask from 'react-native-barcode-mask';
 import RNFS from 'react-native-fs';
 import axios from 'axios';
 import ImageResizer from 'react-native-image-resizer';
+import futch from './api';
 
 const App = () => {
   const [hasPermission, setHasPermission] = useState(false);
@@ -18,16 +19,69 @@ const App = () => {
   };
 
   const onPhotoCaptured = async ref => {
-    var formData = new FormData();
+    const formData = new FormData();
 
     const apiKey =
       'SQSKUdOMO6BcbK1I090571wsfl0JMjWPd971AIMidtIJqWkJmL13l8umXzEjQmoP';
     const url =
       'https://asli-documents-service.dev.in.affinidi.io/api/v1/documents/extract-document';
 
+    const headers = {
+      Accept: 'application/json',
+      'api-key': apiKey,
+      'Content-Type': 'multipart/form-data',
+    };
+
     const photo = await ref.current.takePhoto({
       flash: 'off',
     });
+
+    const optimize = await ImageResizer.createResizedImage(
+      `file://${photo.path}`,
+      1000,
+      1000,
+      'JPEG',
+      100,
+    );
+
+    const uriParts = photo.path.split('.');
+    const fileType = uriParts[uriParts.length - 1];
+
+    const frontSideDoc = {
+      uri: optimize?.uri,
+      type: `image/${fileType}`,
+      name: `${uriParts[2]}.${fileType}`,
+      mimetype: `image/${fileType}`,
+    };
+
+    formData.append('docType', 'ADHAR');
+    formData.append('frontSideDocument', frontSideDoc);
+
+    try {
+      const response = await fetch(url, {
+        method: 'post',
+        body: formData,
+        headers,
+      });
+
+      const res = await response.json();
+
+      console.log(res);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const captureImage = async ref => {
+    var formData = new FormData();
+    const photo = await ref.current.takePhoto({
+      flash: 'off',
+    });
+
+    const apiKey =
+      'SQSKUdOMO6BcbK1I090571wsfl0JMjWPd971AIMidtIJqWkJmL13l8umXzEjQmoP';
+    const url =
+      'https://asli-documents-service.dev.in.affinidi.io/api/v1/documents/extract-document';
 
     const optimize = await ImageResizer.createResizedImage(
       `file://${photo.path}`,
@@ -50,24 +104,28 @@ const App = () => {
 
     console.log('formData', formData);
 
-    try {
-      let myHeaders = new Headers();
-      myHeaders.append('Accept', 'application/json, text/plain');
-      myHeaders.append('Content-Type', 'multipart/form-data');
-      myHeaders.append('api-key', apiKey);
+    const data = new FormData();
 
-      fetch(url, {
-        method: 'POST',
-        headers: myHeaders,
+    // data.append('photo', {
+    //   uri: source.uri,
+    //   type: 'image/jpeg',
+    //   name: 'testPhotoName',
+    // });
+
+    futch(
+      url,
+      {
+        method: 'post',
         body: formData,
-        redirect: 'follow',
-      })
-        .then(response => response.text())
-        .then(result => console.log(result))
-        .catch(error => console.log('error from catch', error));
-    } catch (error) {
-      console.log('errorsdfsdfs', error);
-    }
+      },
+      progressEvent => {
+        const progress = progressEvent.loaded / progressEvent.total;
+        console.log(progress);
+      },
+    ).then(
+      res => console.log(res),
+      err => console.log(err),
+    );
   };
 
   useEffect(() => {
@@ -116,8 +174,8 @@ const App = () => {
       />
       <Button
         onPress={() => {
+          // captureImage(cameraRef);
           onPhotoCaptured(cameraRef);
-          // onPhotoCaptured(cameraRef);
         }}
         title="Click"
       />
